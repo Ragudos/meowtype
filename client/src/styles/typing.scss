@@ -1,0 +1,60 @@
+@use "./functions/" as *;
+@use "./mixins/" as *;
+@use "./variables/" as *;
+
+#wordsWrapper {
+    max-width: calc(#{$max-content-width} * 0.6);
+
+    position: relative;
+
+    overflow: visible clip;
+
+    margin: 0 auto;
+}
+
+#words {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+}
+
+.word {
+    position: relative;
+
+    @include font-size(16);
+    font-variant: no-common-ligatures;
+
+    margin: 0.25em 0.3em;
+
+    border-bottom: 2px solid transparent;
+}
+
+.word letter {
+    color: hsl(var(--sub-foreground) / 0.675);
+
+    border: solid 0.05em transparent;
+
+    transition-property: color, border-color;
+    transition-duration: #{$transition-duration};
+    transition-timing-function: ease-in;
+}
+
+.word .correct {
+    color: hsl(var(--sub-foreground));
+}
+
+.word .incorrect {
+    color: hsl(var(--typing-error-foreground));
+}
+
+.word .extra.incorrect {
+    color: hsl(var(--typing-error-extra-foreground));
+}
+
+.word.incorrect.typed letter:not(.correct, .incorrect, .extra) {
+    border-bottom-color: hsl(var(--typing-error-foreground));
+}

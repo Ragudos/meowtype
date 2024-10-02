@@ -1,0 +1,18 @@
+@use "../variables" as *;
+@use "../mixins" as *;
+
+@function theme($theme_name, $color_name) {
+    @return map-get(map-get($themes, $theme_name), $color_name);
+}
+
+@function color_in_theme($key) {
+    @return map-get($theme_map, $key);
+}
+
+@function space($space-system, $space-value) {
+    @return map-get(map-get($space-systems, $space-system), $space-value);
+}
+
+@function spaceGoldenRatio($space-value) {
+    @return map-get(map-get($space-systems, golden-ratio), $space-value);
+}

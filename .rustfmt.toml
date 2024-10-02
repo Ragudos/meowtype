@@ -1,0 +1,12 @@
+# .rustfmt.toml
+
+hard_tabs = false
+
+# Set the tab width to 4 spaces
+tab_spaces = 4
+
+# Limit line width to 80 characters
+max_width = 80
+
+# Align function parameters to the opening paren
+fn_args_layout = "block"

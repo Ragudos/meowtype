@@ -1,0 +1,206 @@
+@use "./functions/" as *;
+@use "./mixins/" as *;
+@use "./variables/" as *;
+
+:root {
+    --max-content-width: #{$max-content-width};
+    --radius: #{$radius};
+
+    --animation-duration: #{$transition-duration};
+
+    --space-0-gr: #{spaceGoldenRatio(space-0)};
+    --space-1-gr: #{spaceGoldenRatio(space-1)};
+    --space-2-gr: #{spaceGoldenRatio(space-2)};
+    --space-3-gr: #{spaceGoldenRatio(space-3)};
+    --space-4-gr: #{spaceGoldenRatio(space-4)};
+    --space-5-gr: #{spaceGoldenRatio(space-5)};
+    --space-6-gr: #{spaceGoldenRatio(space-6)};
+    --space-7-gr: #{spaceGoldenRatio(space-7)};
+}
+
+@include themify($themes) {
+    color-scheme: $theme_name;
+
+    --background: #{color_in_theme("background")};
+    --foreground: #{color_in_theme("foreground")};
+
+    --sub-foreground: #{color_in_theme("sub-foreground")};
+
+    --card: #{color_in_theme("card")};
+    --card-foreground: #{color_in_theme("card-foreground")};
+
+    --popover: #{color_in_theme("popover")};
+    --popover-foreground: #{color_in_theme("popover-foreground")};
+
+    --primary: #{color_in_theme("primary")};
+    --primary-foreground: #{color_in_theme("primary-foreground")};
+
+    --secondary: #{color_in_theme("secondary")};
+    --secondary-foreground: #{color_in_theme("secondary-foreground")};
+
+    --muted: #{color_in_theme("muted")};
+    --muted-foreground: #{color_in_theme("muted-foreground")};
+
+    --accent: #{color_in_theme("accent")};
+    --accent-foreground: #{color_in_theme("accent-foreground")};
+
+    --destructive: #{color_in_theme("destructive")};
+    --destructive-foreground: #{color_in_theme("destructive-foreground")};
+
+    --typing-error-foreground: #{color_in_theme("typing-error-foreground")};
+    --typing-error-extra-foreground: #{color_in_theme(
+            "typing-error-extra-foreground"
+        )};
+
+    --border: #{color_in_theme("border")};
+    --input: #{color_in_theme("input")};
+    --ring: #{color_in_theme("ring")};
+}
+
+body {
+    font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Oxygen,
+        Ubuntu,
+        Cantarell,
+        "Open Sans",
+        "Helvetica Neue",
+        sans-serif;
+
+    line-height: 1.5;
+
+    background-color: hsl(var(--background));
+    color: hsl(var(--foregorund));
+}
+
+h1,
+.h1 {
+    font-size: 5.61rem;
+}
+
+h2,
+.h2 {
+    font-size: 4.209rem;
+}
+
+h3,
+.h3 {
+    font-size: 3.157rem;
+}
+
+h4,
+.h4 {
+    font-size: 2.369rem;
+}
+
+h5,
+.h5 {
+    font-size: 1.777rem;
+}
+
+h6,
+.h6 {
+    font-size: 1.333rem;
+}
+
+small,
+.small {
+    font-size: .75rem;
+}
+
+.smallest {
+    font-size: 0.563rem;
+}
+
+.container {
+    width: min(calc(100% - #{$padding-inline} * 2), #{$max-content-width});
+    margin: 0 auto;
+
+    padding-block: var(--space-2-gr);
+}
+
+.hidden-interactable {
+    position: absolute;
+
+    opacity: 0;
+
+    width: 0.1px;
+    height: 0.1px;
+
+    cursor: default;
+
+    clip-path: inset(50%);
+
+    overflow: hidden;
+    text-overflow: clip;
+
+    border: none;
+    outline: none;
+    padding: 0;
+    margin: 0;
+}
+
+section > p {
+    margin-top: var(--space-1-gr);
+}
+
+button,
+a.btn,
+input[type="submit"],
+input[type="reset"] {
+    transition-property: color, background-color, transform, box-shadow;
+    transition-duration: #{$transition-duration};
+    transition-timing-function: ease-in;
+
+    will-change: color, background-color, transform, box-shadow;
+
+    border-radius: var(--radius);
+
+    padding-inline: calc(var(--radius));
+    padding-block: calc(var(--radius) * 0.5);
+
+    margin-top: var(--space-5-gr);
+
+    &.primary {
+        background-color: hsl(var(--primary) / var(--_bg-opacity, 1));
+        color: hsl(var(--primary-foreground) / var(--_text-opacity, 1));
+    }
+
+    &.secondary {
+        background-color: hsl(var(--secondary) / var(--_bg-opacity, 1));
+        color: hsl(var(--secondary-foreground) / var(--_text-opacity, 1));
+    }
+
+    &.accent {
+        background-color: hsl(var(--accent) / var(--_bg-opacity, 1));
+        color: hsl(var(--accent-foreground) / var(--_text-opacity, 1));
+    }
+
+    &.muted {
+        background-color: hsl(var(--muted) / var(--_bg-opacity, 1));
+        color: hsl(var(--muted-foreground) / var(--_text-opacity, 1));
+    }
+
+    &.destructive {
+        background-color: hsl(var(--destructive) / var(--_bg-opacity, 1));
+        color: hsl(var(--destructive-foreground) / var(--_text-opacity, 1));
+    }
+
+    &:hover {
+        --_bg-opacity: 0.76;
+        transform: translateY(-2.5%);
+        @include layered-shadow();
+    }
+}
+
+.fade-out {
+    @include fade(hide);
+}
+
+.fade-in {
+    @include fade(show);
+}

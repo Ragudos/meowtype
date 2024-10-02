@@ -1,0 +1,71 @@
+$themes: (
+    light: (
+        background: 196 72% 93%,
+        foreground: 197 67% 7%,
+
+        sub-foreground: 197 67% 37%,
+
+        card: 196 72% 93%,
+        card-foreground: 197 67% 7%,
+
+        popover: 196 72% 93%,
+        popover-foreground: 197 67% 7%,
+
+        primary: 200 68% 26%,
+        primary-foreground: 196 72% 93%,
+
+        secondary: 221 68% 68%,
+        secondary-foreground: 197 67% 7%,
+
+        muted: 196 73% 20%,
+        muted-foreground: 197 67% 70%,
+
+        accent: 225 69% 48%,
+        accent-foreground: 196 72% 93%,
+
+        destructive: 0 85% 60%,
+        destructive-foreground: 197 67% 7%,
+
+        typing-error-foreground: 354 55% 74%,
+        typing-error-extra-foreground: 354 50% 53%,
+
+        border: 196 73% 20%,
+        input: 196 73% 20%,
+        ring: 225 69% 40%,
+    ),
+
+    dark: (
+        background: 196 72% 7%,
+        foreground: 198 67% 93%,
+
+        sub-foreground: 197 67% 63%,
+
+        card: 196 72% 7%,
+        card-foreground: 198 67% 93%,
+
+        popover: 196 72% 7%,
+        popover-foreground: 198 67% 93%,
+
+        primary: 200 68% 74%,
+        primary-foreground: 196 72% 7%,
+
+        secondary: 221 68% 32%,
+        secondary-foreground: 198 67% 93%,
+
+        muted: 196 73% 80%,
+        muted-foreground: 198 67% 93%,
+
+        accent: 225 69% 52%,
+        accent-foreground: 198 67% 93%,
+
+        destructive: 0 62% 30%,
+        destructive-foreground: 199 69% 10%,
+
+        typing-error-foreground: 354 55% 54%,
+        typing-error-extra-foreground: 354 50% 33%,
+
+        border: 196 72% 60%,
+        input: 196 73% 80%,
+        ring: 225 69% 60%,
+    ),
+);

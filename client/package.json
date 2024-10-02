@@ -1,0 +1,29 @@
+{
+  "name": "@meowtype/client",
+  "version": "1.0.0",
+  "type": "module",
+  "keywords": [],
+  "author": "Aaron Ragudos",
+  "license": "MIT",
+  "description": "A client for meowtype",
+  "private": true,
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "format": "prettier --write src"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "esbuild": "^0.24.0",
+    "esbuild-plugin-tsc": "^0.4.0",
+    "esbuild-sass-plugin": "^3.3.1",
+    "postcss": "^8.4.47",
+    "postcss-preset-env": "^10.0.5",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "superstruct": "^2.0.2",
+    "toastmynuts": "^2.0.0"
+  }
+}

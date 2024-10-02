@@ -1,0 +1,72 @@
+<html lang="en" data-theme="{{metadata.theme}}">
+
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{metadata.title}}</title>
+    <meta name="title" content="{{metadata.title}}" />
+    <meta name="description" content="{{metadata.description}}" />
+    {{#if metadata.open_graph}}
+      <meta name="og:title" content="{{metadata.open_graph.title}}" />
+      <meta
+        name="og:description"
+        content="{{metadata.open_graph.description}}"
+      />
+    {{else}}
+      <meta name="og:title" content="{{metadata.title}}" />
+      <meta name="og:description" content="{{metadata.description}}" />
+    {{/if}}
+    <link rel="stylesheet" href="/dist/styles/resets.css" />
+    <link rel="stylesheet" href="/dist/styles/root.css" />
+
+    <!-- TODO: Have these styles be loaded dynamically -->
+    <link rel="stylesheet" href="/dist/styles/typing.css" />
+  </head>
+
+  <body>
+    <header class="container">
+      <a href="/" title="Home">
+        meowtype
+      </a>
+    </header>
+    <main class="container">
+      <section id="heroSection" aria-labelledby="heroTitle">
+        <h1 id="heroTitle">meowtype</h1>
+        <p id="heroDescription">
+          A minimalistic and smooth typing web application at your fingertips.
+        </p>
+        <button
+          type="button"
+          id="startTypingBtn"
+          class="primary"
+        >
+          Start typing!
+        </button>
+      </section>
+
+      <div id="typingScreen" class="hidden">
+        <div id="wordsWrapper">
+          <div id="words"></div>
+          <input
+            autofocus
+            type="text"
+            id="wordsInput"
+            class="hidden-interactable"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            data-enable-grammarly="false"
+            data-gramm="false"
+            list="autocompleteOff"
+            spellcheck="false"
+          />
+          <div id="outOfFocusWarning"></div>
+          <div id="paceCaret" class="hidden"></div>
+          <div id="caret"></div>
+        </div>
+      </div>
+    </main>
+    <script src="/dist/index.js" type="module"></script>
+  </body>
+
+</html>
