@@ -10,6 +10,8 @@
     overflow: visible clip;
 
     margin: 0 auto;
+
+    position: relative;
 }
 
 #words {
@@ -57,4 +59,21 @@
 
 .word.incorrect.typed letter:not(.correct, .incorrect, .extra) {
     border-bottom-color: hsl(var(--typing-error-foreground));
+}
+
+#caret {
+    position: absolute;
+
+    top: 0;
+    left: 0;
+
+    transform: translate3d(var(--_x, 0), var(--_y, 0), 0);
+
+    width: var(--_width, 0.25rem);
+    height: var(--_height, 0.75rem);
+
+    background-color: hsl(var(--accent) / 0.75);
+
+    transition-property: opacity, transform, top, left, right, bottom;
+    transition-duration: #{$transition-duration};
 }

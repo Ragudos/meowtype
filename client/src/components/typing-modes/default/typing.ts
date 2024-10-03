@@ -4,6 +4,7 @@
  */
 
 import { getItemAt } from "@/lib/utils/array";
+import Caret from "./caret";
 import DefaultTypingModeState, { DefaultTypingModeStateEvent } from "./state";
 
 type Character = {
@@ -84,14 +85,21 @@ class DefaultTypingMode {
     readonly #stateEvtListener: (ev: DefaultTypingModeStateEvent) => void;
     readonly inputId: string;
     readonly wordsContainerId: string;
+    readonly caret: Caret;
 
     /**
      *
      * @param inputId id of input element to listen to
      * @param wordsContainerId id of container to append words to
+     * @param caretElId id of caret element
      * @param strToType word to type for this typing mode
      */
-    constructor(inputId: string, wordsContainerId: string, strToType: string) {
+    constructor(
+        inputId: string,
+        wordsContainerId: string,
+        caretElId: string,
+        strToType: string,
+    ) {
         this.inputId = inputId;
         this.wordsContainerId = wordsContainerId;
 
@@ -100,6 +108,8 @@ class DefaultTypingMode {
         this.#keydownListener = this.#onKeyDown.bind(this);
         this.#focusListener = this.#onContainerClick.bind(this);
         this.#stateEvtListener = this.#onStateUpdate.bind(this);
+
+        this.caret = new Caret(caretElId);
     }
 
     start(): void {
@@ -117,6 +127,13 @@ class DefaultTypingMode {
         this.#state.hasStarted = true;
 
         this.#initializeWordsContainer();
+        // init
+        this.caret.update(
+            { evType: "addChar" },
+            this.#getWordsContainer(),
+            this.#state.words,
+            this.#state.typedWords,
+        );
     }
 
     stop(): void {
@@ -272,20 +289,19 @@ class DefaultTypingMode {
     #onStateUpdate(ev: DefaultTypingModeStateEvent): void {
         // TODO: A way to verify if the el at idx is the same as the word in memory.
         const wordsContainer = this.#getWordsContainer();
+        const wordBeingTyped = getItemAt(this.#state.words, 0);
+        const wordBeingTypedIdx = wordBeingTyped.index;
+        const wordEl = wordsContainer.children[
+            wordBeingTypedIdx
+        ] as HTMLElement;
 
         switch (ev.evType) {
             case "addChar":
                 {
-                    const wordBeingTyped = getItemAt(this.#state.words, 0);
-                    const wordBeingTypedIdx = wordBeingTyped.index;
-                    const wordEl = wordsContainer.children[
-                        wordBeingTypedIdx
-                    ] as HTMLElement;
                     const latestCharacterTyped = getItemAt(
                         wordBeingTyped.typedCharacters,
                         -1,
                     );
-                    const latestCharacterTypedIdx = latestCharacterTyped.idx;
 
                     if (latestCharacterTyped.isExtra) {
                         const charEl = document.createElement("letter");
@@ -295,10 +311,10 @@ class DefaultTypingMode {
 
                         wordEl.appendChild(charEl);
 
-                        return;
+                        break;
                     }
 
-                    const charEl = wordEl.children[latestCharacterTypedIdx];
+                    const charEl = wordEl.children[latestCharacterTyped.idx];
 
                     if (
                         latestCharacterTyped.typedValue ===
@@ -312,11 +328,6 @@ class DefaultTypingMode {
                 break;
             case "deleteChar":
                 {
-                    const wordBeingTyped = getItemAt(this.#state.words, 0);
-                    const wordBeingTypedIdx = wordBeingTyped.index;
-                    const wordEl = wordsContainer.children[
-                        wordBeingTypedIdx
-                    ] as HTMLElement;
                     const HAS_EXTRA_CHARS =
                         wordBeingTyped.typedCharacters.length >=
                         wordBeingTyped.characterCount;
@@ -331,7 +342,7 @@ class DefaultTypingMode {
 
                         wordEl.children[latestTypedCharacterIdx + 1].remove();
 
-                        return;
+                        break;
                     }
 
                     const latestDeletedChar = getItemAt(
@@ -347,13 +358,8 @@ class DefaultTypingMode {
                 break;
             case "backToPrevWord":
                 {
-                    // This is the previous word
-                    const wordBeingTyped = getItemAt(this.#state.words, 0);
-                    const wordBeingTypedIdx = wordBeingTyped.index;
                     const previouslyTypedWordIdx = wordBeingTypedIdx + 1;
 
-                    const wordBeingTypedEl =
-                        wordsContainer.children[wordBeingTypedIdx];
                     const previouslyTypedWordEl =
                         wordsContainer.children[previouslyTypedWordIdx];
 
@@ -363,30 +369,22 @@ class DefaultTypingMode {
                         "typed",
                     );
 
-                    wordBeingTypedEl.classList.add("active");
-                    wordBeingTypedEl.classList.remove(
-                        "correct",
-                        "incorrect",
-                        "typed",
-                    );
+                    wordEl.classList.add("active");
+                    wordEl.classList.remove("correct", "incorrect", "typed");
                 }
                 break;
             case "nextWord":
                 {
-                    const wordBeingTyped = getItemAt(this.#state.words, 0);
                     const latestTypedWord = getItemAt(
                         this.#state.typedWords,
                         -1,
                     );
-                    const wordBeingTypedIdx = wordBeingTyped.index;
                     const latestTypedWordIdx = latestTypedWord.index;
 
-                    const wordBeingTypedEl =
-                        wordsContainer.children[wordBeingTypedIdx];
                     const latestTypedWordEl =
                         wordsContainer.children[latestTypedWordIdx];
 
-                    wordBeingTypedEl.classList.add("active");
+                    wordEl.classList.add("active");
 
                     latestTypedWordEl.classList.remove("active");
                     latestTypedWordEl.classList.add(
@@ -396,9 +394,17 @@ class DefaultTypingMode {
                 }
                 break;
         }
+
+        this.caret.update(
+            ev,
+            wordsContainer,
+            this.#state.words,
+            this.#state.typedWords,
+        );
     }
 }
 
 export default DefaultTypingMode;
 export { typedCharacterToCharacter, wordToTypedWord };
 export type { Character, TypedCharacter, TypedWord, Word };
+

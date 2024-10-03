@@ -46,6 +46,7 @@ async function loadTypingScreen(): Promise<void> {
     const typingMode = new defaultTypingModeModule.default(
         "wordsInput",
         "words",
+        "caret",
         str,
     );
 
