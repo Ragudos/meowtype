@@ -59,7 +59,7 @@ class Caret {
                 break;
             case "nextWord":
                 {
-                    // wordEl IS the prev word in the context when
+                    // wordEl IS the "nextWord" in the context when
                     // this function is called
                     const characterToBeTyped = getItemAt(
                         wordBeingTyped.characters,
