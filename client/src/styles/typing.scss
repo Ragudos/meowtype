@@ -69,11 +69,11 @@
 
     transform: translate3d(var(--_x, 0), var(--_y, 0), 0);
 
-    width: var(--_width, 0.25rem);
-    height: var(--_height, 0.75rem);
+    width: var(--_width, 0.25em);
+    height: var(--_height, 0.5em);
 
     background-color: hsl(var(--accent) / 0.75);
 
     transition-property: opacity, transform, top, left, right, bottom;
-    transition-duration: #{$transition-duration};
+    transition-duration: calc(#{$transition-duration} / 2);
 }

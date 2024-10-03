@@ -112,8 +112,7 @@ class Caret {
             } else {
                 caretElWidth =
                     nextWordBoundingRect.left -
-                    wordsContainerBoundingRect.left +
-                    nextWordBoundingRect.width -
+                    wordsContainerBoundingRect.left -
                     (wordElBoundingRect.left -
                         wordsContainerBoundingRect.left +
                         wordElBoundingRect.width);
@@ -129,10 +128,7 @@ class Caret {
                 caretTargetBoundingRect.left - wordsContainerBoundingRect.left;
         }
 
-        caretEl.style.setProperty(
-            "--_width",
-            caretTargetBoundingRect.width + "px",
-        );
+        caretEl.style.setProperty("--_width", caretElWidth + "px");
         caretEl.style.setProperty(
             "--_height",
             caretTargetBoundingRect.height + "px",
