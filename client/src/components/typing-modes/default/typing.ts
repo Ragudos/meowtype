@@ -4,6 +4,7 @@
  */
 
 import { getItemAt } from "@/lib/utils/array";
+import { DomMetadata, getDomMetadataOfChildren } from "@/lib/utils/dom";
 import Caret from "./caret";
 import DefaultTypingModeState, { DefaultTypingModeStateEvent } from "./state";
 
@@ -75,6 +76,7 @@ function typedCharacterToCharacter(typedChar: TypedCharacter): Character {
 
 class DefaultTypingMode {
     #state: DefaultTypingModeState;
+    #wordsMetadata: DomMetadata[];
 
     /**
      * Since we `bind` this to the #onKeyDown member,
@@ -284,6 +286,8 @@ class DefaultTypingMode {
         }
 
         wordsContainer.classList.add("initialized");
+
+        this.#wordsMetadata = getDomMetadataOfChildren(wordsContainer);
     }
 
     #onStateUpdate(ev: DefaultTypingModeStateEvent): void {
@@ -359,7 +363,6 @@ class DefaultTypingMode {
             case "backToPrevWord":
                 {
                     const previouslyTypedWordIdx = wordBeingTypedIdx + 1;
-
                     const previouslyTypedWordEl =
                         wordsContainer.children[previouslyTypedWordIdx];
 
@@ -379,10 +382,8 @@ class DefaultTypingMode {
                         this.#state.typedWords,
                         -1,
                     );
-                    const latestTypedWordIdx = latestTypedWord.index;
-
                     const latestTypedWordEl =
-                        wordsContainer.children[latestTypedWordIdx];
+                        wordsContainer.children[latestTypedWord.index];
 
                     wordEl.classList.add("active");
 
@@ -401,6 +402,35 @@ class DefaultTypingMode {
             this.#state.words,
             this.#state.typedWords,
         );
+
+        // TODO: Have a property `relativeIdx` and `absoluteIdx` for each word
+        // to be used here when deleting the top-most row of words.
+        if (ev.evType === "nextWord") {
+            const idxOfLastItemInFirstRow = this.#wordsMetadata.findIndex(
+                (v, i) =>
+                    v.rowIdx == 0 &&
+                    this.#wordsMetadata[i + 1] &&
+                    this.#wordsMetadata[i + 1].rowIdx == 1,
+            );
+            const wordElMetadata = this.#wordsMetadata[wordBeingTypedIdx];
+
+            if (wordElMetadata.rowIdx == 2) {
+                this.#state.typedWords.splice(0, idxOfLastItemInFirstRow);
+                this.#wordsMetadata.splice(0, idxOfLastItemInFirstRow);
+
+                const toRemove: Element[] = [];
+
+                for (let i = 0; i <= idxOfLastItemInFirstRow; ++i) {
+                    toRemove.push(wordsContainer.children[i]);
+                }
+
+                for (let i = 0, l = toRemove.length; i < l; ++i) {
+                    toRemove[i].remove();
+                }
+
+                console.log("third col");
+            }
+        }
     }
 }
 
