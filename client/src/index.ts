@@ -1,38 +1,34 @@
 import "@/lib/utils/logger";
 import { getTransitionDuration } from "./lib/utils/styles";
+import { sleep } from "./lib/utils/time";
 
 const startTypingBtn = document.getElementById(
     "startTypingBtn",
 ) as HTMLButtonElement;
 
-startTypingBtn.addEventListener("click", () => {
+startTypingBtn.addEventListener("click", async () => {
     const heroSection = document.getElementById("heroSection") as HTMLElement;
 
     heroSection.classList.add("fade-out");
 
     const transitionDuration = getTransitionDuration(heroSection);
 
-    // TODO: abstract this animation debouncer or something.
+    await sleep(transitionDuration);
 
-    setTimeout(() => {
-        heroSection.classList.add("hidden");
-        heroSection.classList.remove("fade-out");
+    heroSection.classList.add("hidden");
+    heroSection.classList.remove("fade-out");
 
-        const typingScreen = document.getElementById(
-            "typingScreen",
-        ) as HTMLElement;
+    const typingScreen = document.getElementById("typingScreen") as HTMLElement;
 
-        typingScreen.classList.remove("hidden");
-        typingScreen.classList.add("fade-in");
+    typingScreen.classList.remove("hidden");
+    typingScreen.classList.add("fade-in");
 
-        const transitionDuration = getTransitionDuration(typingScreen);
+    const typingScreenTransitionDuration = getTransitionDuration(typingScreen);
 
-        setTimeout(() => {
-            typingScreen.classList.remove("fade-in");
+    await sleep(typingScreenTransitionDuration);
 
-            loadTypingScreen();
-        }, transitionDuration);
-    }, transitionDuration);
+    typingScreen.classList.remove("fade-in");
+    await loadTypingScreen();
 });
 
 async function loadTypingScreen(): Promise<void> {

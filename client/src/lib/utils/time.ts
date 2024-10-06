@@ -15,4 +15,11 @@ function debounce(cb: Function, time: number): (...args: unknown[]) => void {
     };
 }
 
-export { debounce };
+function sleep(duration: number): Promise<void> {
+    return new Promise((res, rej) => {
+        setTimeout(res, duration);
+    });
+}
+
+export { debounce, sleep };
+

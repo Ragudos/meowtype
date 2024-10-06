@@ -54,13 +54,22 @@ class DefaultTypingModeState {
                 characterCount: characters.length,
                 characters: [],
                 typedCharacters: [],
-                index: i,
+                idx: {
+                    relative: i,
+                    absolute: i,
+                },
             };
 
             for (let j = 0; j < characters.length; ++j) {
                 wordObj.characters.push({
-                    idx: j,
-                    originalIdx: currentCharacterIdx + j,
+                    idx: {
+                        relative: j,
+                        absolute: j,
+                    },
+                    originalIdx: {
+                        relative: currentCharacterIdx + j,
+                        absolute: currentCharacterIdx + j
+                    },
                     value: getItemAt(characters, j),
                 });
             }
@@ -81,10 +90,7 @@ class DefaultTypingModeState {
 
         // If true, we go back to previously typed word
         if (NO_CHARACTERS_TYPED) {
-            const IS_WORD_BEGINNING_OF_ORIGINAL_STRING =
-                wordToBeTyped.index === 0;
-
-            if (IS_WORD_BEGINNING_OF_ORIGINAL_STRING) {
+            if (wordToBeTyped.idx.relative === 0) {
                 return;
             }
 
@@ -93,22 +99,21 @@ class DefaultTypingModeState {
             // Don't allow the user to go back
             // to previously typed word if it's already correct.
             if (latestTypedWord.isCorrect) {
-                ev.preventDefault();
-
-                return;
+                return ev.preventDefault();
             }
 
-            const HAS_EXTRA_CHARS = latestTypedWord.typedCharacters.some(
-                (c) => c.isExtra,
+            const HAS_SKIPPED_CHARS = latestTypedWord.typedCharacters.some(
+                (c) => c.typedValue === " ",
             );
+
             const castLatestTypedWordToWord: Word = {
-                index: latestTypedWord.index,
-                characters: !HAS_EXTRA_CHARS
+                idx: latestTypedWord.idx,
+                characters: HAS_SKIPPED_CHARS
                     ? this.#filterSkippedCharacters(
                           latestTypedWord.typedCharacters,
                       ).map(typedCharacterToCharacter)
                     : latestTypedWord.characters,
-                typedCharacters: !HAS_EXTRA_CHARS
+                typedCharacters: HAS_SKIPPED_CHARS
                     ? this.#filterSkippedCharacters(
                           latestTypedWord.typedCharacters,
                           false,
@@ -170,8 +175,14 @@ class DefaultTypingModeState {
             const lastTypedChar = getItemAt(wordToBeTyped.typedCharacters, -1);
 
             wordToBeTyped.typedCharacters.push({
-                originalIdx: -1,
-                idx: lastTypedChar.idx + 1,
+                originalIdx: {
+                    relative: -1,
+                    absolute: -1
+                },
+                idx: {
+                    relative: lastTypedChar.idx.relative + 1,
+                    absolute: lastTypedChar.idx.absolute + 1,
+                },
                 value: key,
                 typedValue: key,
                 isExtra: true,

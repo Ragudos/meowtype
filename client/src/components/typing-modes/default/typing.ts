@@ -8,17 +8,30 @@ import { DomMetadata, getDomMetadataOfChildren } from "@/lib/utils/dom";
 import Caret from "./caret";
 import DefaultTypingModeState, { DefaultTypingModeStateEvent } from "./state";
 
+type Idx = {
+    /** absolute idx in the word or string it's in */
+    absolute: number;
+    /**
+     * relative idx where it changes based
+     * on its position in word or string it's in.
+     * will be negative if shifted (deleted) from string
+     */
+    relative: number;
+};
+
 type Character = {
     /** Position of character in the word it's in */
-    idx: number;
+    idx: Idx;
     /**
      *
      * Position of character in original string.
      * Will be -1 if this character is of type
      *
      * {@link TypedCharacter}
+     *
+     * and `isExtra` is true
      */
-    originalIdx: number;
+    originalIdx: Idx;
     value: string;
 };
 
@@ -35,7 +48,7 @@ type Word = {
     typedCharacters: TypedCharacter[];
     characters: Character[];
     /** Index of word in original string it's in */
-    index: number;
+    idx: Idx;
 };
 
 type TypedWord = Word & {
@@ -77,6 +90,8 @@ function typedCharacterToCharacter(typedChar: TypedCharacter): Character {
 class DefaultTypingMode {
     #state: DefaultTypingModeState;
     #wordsMetadata: DomMetadata[];
+    /** Typed words removed from the DOM */
+    #removedWords: TypedWord[];
 
     /**
      * Since we `bind` this to the #onKeyDown member,
@@ -110,6 +125,7 @@ class DefaultTypingMode {
         this.#keydownListener = this.#onKeyDown.bind(this);
         this.#focusListener = this.#onContainerClick.bind(this);
         this.#stateEvtListener = this.#onStateUpdate.bind(this);
+        this.#removedWords = [];
 
         this.caret = new Caret(caretElId);
     }
@@ -206,6 +222,8 @@ class DefaultTypingMode {
             default:
                 this.#state.addCharacter(ev);
         }
+
+        console.log(this);
     }
 
     #onContainerClick(ev: MouseEvent): void {
@@ -294,9 +312,8 @@ class DefaultTypingMode {
         // TODO: A way to verify if the el at idx is the same as the word in memory.
         const wordsContainer = this.#getWordsContainer();
         const wordBeingTyped = getItemAt(this.#state.words, 0);
-        const wordBeingTypedIdx = wordBeingTyped.index;
         const wordEl = wordsContainer.children[
-            wordBeingTypedIdx
+            wordBeingTyped.idx.relative
         ] as HTMLElement;
 
         switch (ev.evType) {
@@ -318,7 +335,8 @@ class DefaultTypingMode {
                         break;
                     }
 
-                    const charEl = wordEl.children[latestCharacterTyped.idx];
+                    const charEl =
+                        wordEl.children[latestCharacterTyped.idx.relative];
 
                     if (
                         latestCharacterTyped.typedValue ===
@@ -341,10 +359,10 @@ class DefaultTypingMode {
                             wordBeingTyped.typedCharacters,
                             -1,
                         );
-                        const latestTypedCharacterIdx =
-                            latestTypedCharacter.idx;
 
-                        wordEl.children[latestTypedCharacterIdx + 1].remove();
+                        wordEl.children[
+                            latestTypedCharacter.idx.relative + 1
+                        ].remove();
 
                         break;
                     }
@@ -353,8 +371,8 @@ class DefaultTypingMode {
                         wordBeingTyped.characters,
                         0,
                     );
-                    const latestCharacterTypedIdx = latestDeletedChar.idx;
-                    const charEl = wordEl.children[latestCharacterTypedIdx];
+                    const charEl =
+                        wordEl.children[latestDeletedChar.idx.relative];
 
                     charEl.classList.remove("correct", "incorrect");
                 }
@@ -362,7 +380,8 @@ class DefaultTypingMode {
                 break;
             case "backToPrevWord":
                 {
-                    const previouslyTypedWordIdx = wordBeingTypedIdx + 1;
+                    const previouslyTypedWordIdx =
+                        wordBeingTyped.idx.relative + 1;
                     const previouslyTypedWordEl =
                         wordsContainer.children[previouslyTypedWordIdx];
 
@@ -383,7 +402,7 @@ class DefaultTypingMode {
                         -1,
                     );
                     const latestTypedWordEl =
-                        wordsContainer.children[latestTypedWord.index];
+                        wordsContainer.children[latestTypedWord.idx.relative];
 
                     wordEl.classList.add("active");
 
@@ -403,8 +422,7 @@ class DefaultTypingMode {
             this.#state.typedWords,
         );
 
-        // TODO: Have a property `relativeIdx` and `absoluteIdx` for each word
-        // to be used here when deleting the top-most row of words.
+        // TODO: Abstract this and make it more readable
         if (ev.evType === "nextWord") {
             const idxOfLastItemInFirstRow = this.#wordsMetadata.findIndex(
                 (v, i) =>
@@ -412,11 +430,79 @@ class DefaultTypingMode {
                     this.#wordsMetadata[i + 1] &&
                     this.#wordsMetadata[i + 1].rowIdx == 1,
             );
-            const wordElMetadata = this.#wordsMetadata[wordBeingTypedIdx];
+            const wordElMetadata =
+                this.#wordsMetadata[wordBeingTyped.idx.relative];
 
+            // TODO: Also update the removedWord's properties
             if (wordElMetadata.rowIdx == 2) {
-                this.#state.typedWords.splice(0, idxOfLastItemInFirstRow);
-                this.#wordsMetadata.splice(0, idxOfLastItemInFirstRow);
+                const lastNonExtraCharOfLastItemInFirstRow = getItemAt(
+                    this.#state.typedWords,
+                    idxOfLastItemInFirstRow,
+                ).typedCharacters.findLast((v) => !v.isExtra);
+
+                let currCharOrigIdx =
+                    (lastNonExtraCharOfLastItemInFirstRow!.originalIdx
+                        .relative +
+                        // +2 to take the length and whitespace into account
+                        2) *
+                    -1;
+
+                for (let i = 0, l = this.#state.typedWords.length; i < l; ++i) {
+                    const typedWord = this.#state.typedWords[i];
+
+                    typedWord.idx.relative = i - (idxOfLastItemInFirstRow + 1);
+
+                    for (
+                        let j = 0, jl = typedWord.typedCharacters.length;
+                        j < jl;
+                        ++j
+                    ) {
+                        const char = typedWord.typedCharacters[j];
+
+                        if (!char.isExtra) {
+                            char.originalIdx.relative = currCharOrigIdx + j;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    currCharOrigIdx += typedWord.characterCount + 1;
+                }
+
+                for (let i = 0, l = this.#state.words.length; i < l; ++i) {
+                    const word = this.#state.words[i];
+
+                    word.idx.relative =
+                        i -
+                        (idxOfLastItemInFirstRow + 1) +
+                        this.#state.typedWords.length;
+
+                    for (
+                        let j = 0, jl = word.typedCharacters.length;
+                        j < jl;
+                        ++j
+                    ) {
+                        word.typedCharacters[j].originalIdx.relative =
+                            currCharOrigIdx;
+                        currCharOrigIdx += 1;
+                    }
+
+                    for (let j = 0, jl = word.characters.length; j < jl; ++j) {
+                        word.characters[j].originalIdx.relative =
+                            currCharOrigIdx;
+                        currCharOrigIdx += 1;
+                    }
+
+                    currCharOrigIdx += 1;
+                }
+
+                this.#removedWords.push(
+                    ...this.#state.typedWords.splice(
+                        0,
+                        idxOfLastItemInFirstRow + 1,
+                    ),
+                );
+                this.#wordsMetadata.splice(0, idxOfLastItemInFirstRow + 1);
 
                 const toRemove: Element[] = [];
 
@@ -428,7 +514,13 @@ class DefaultTypingMode {
                     toRemove[i].remove();
                 }
 
-                console.log("third col");
+                this.#wordsMetadata = getDomMetadataOfChildren(wordsContainer);
+                this.caret.update(
+                    { evType: "nextWord" },
+                    wordsContainer,
+                    this.#state.words,
+                    this.#state.typedWords,
+                );
             }
         }
     }

@@ -22,7 +22,7 @@ class Caret {
         const caretEl = this.#getCaretEl();
         const wordBeingTyped = getItemAt(words, 0);
         const wordEl = wordsContainer.children[
-            wordBeingTyped.index
+            wordBeingTyped.idx.relative
         ] as HTMLElement;
 
         let caretTargetBoundingRect: undefined | DOMRect;
@@ -38,7 +38,7 @@ class Caret {
                             ? getItemAt(wordBeingTyped.typedCharacters, -1)
                             : getItemAt(wordBeingTyped.characters, 0);
 
-                    const nextCharIdx = latestCharacterTyped.idx + 1;
+                    const nextCharIdx = latestCharacterTyped.idx.relative + 1;
 
                     if (nextCharIdx === wordEl.children.length) {
                         isEndOfWord = true;
@@ -46,10 +46,10 @@ class Caret {
 
                     const latestCharEl =
                         wordEl.children[
-                            (latestCharacterTyped.idx === 0 &&
+                            (latestCharacterTyped.idx.relative === 0 &&
                                 wordBeingTyped.typedCharacters.length === 0) ||
                             isEndOfWord
-                                ? latestCharacterTyped.idx
+                                ? latestCharacterTyped.idx.relative
                                 : nextCharIdx
                         ];
 
@@ -65,7 +65,7 @@ class Caret {
                         wordBeingTyped.characters,
                         0,
                     );
-                    const nextCharIdx = characterToBeTyped.idx + 1;
+                    const nextCharIdx = characterToBeTyped.idx.relative + 1;
 
                     // for single letter words
                     if (nextCharIdx === wordEl.children.length) {
@@ -74,8 +74,8 @@ class Caret {
 
                     const charEl =
                         wordEl.children[
-                            characterToBeTyped.idx === 0 || isEndOfWord
-                                ? characterToBeTyped.idx
+                            characterToBeTyped.idx.relative === 0 || isEndOfWord
+                                ? characterToBeTyped.idx.relative
                                 : nextCharIdx
                         ];
 
@@ -102,7 +102,7 @@ class Caret {
             }
 
             const nextWord = getItemAt(words, 1);
-            const nextWordEl = wordsContainer.children[nextWord.index];
+            const nextWordEl = wordsContainer.children[nextWord.idx.relative];
             const nextWordBoundingRect = nextWordEl.getBoundingClientRect();
             const wordElBoundingRect = wordEl.getBoundingClientRect();
 
