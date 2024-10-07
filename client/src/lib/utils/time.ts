@@ -16,10 +16,14 @@ function debounce(cb: Function, time: number): (...args: unknown[]) => void {
 }
 
 function sleep(duration: number): Promise<void> {
-    return new Promise((res, rej) => {
-        setTimeout(res, duration);
-    });
+    return new Promise((res) => setTimeout(res, duration));
 }
 
-export { debounce, sleep };
+function clearTimeouts(timeouts: number[]): void {
+    for (let i = 0, l = timeouts.length; i < l; ++i) {
+        clearTimeout(timeouts[i]);
+    }
+}
+
+export { clearTimeouts, debounce, sleep };
 

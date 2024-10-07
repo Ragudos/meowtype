@@ -1,4 +1,4 @@
-import { getItemAt } from "@/lib/utils/array";
+import { getItemAt } from "@/lib/utils/misc";
 import { DefaultTypingModeStateEvent } from "./state";
 import { TypedWord, Word } from "./typing";
 

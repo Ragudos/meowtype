@@ -1,5 +1,5 @@
 import { words } from "@/constants/words";
-import { getItemAt } from "./array";
+import { getItemAt } from "./misc";
 
 function generateString(amount: number): string {
     if (amount <= 0) {
@@ -25,3 +25,4 @@ function generateString(amount: number): string {
 }
 
 export { generateString };
+

@@ -1,38 +1,109 @@
-import { object, size, string, Struct } from "superstruct";
+import { Failure, Struct } from "superstruct";
+import { deepClone } from "./misc";
+
+type LocalStorageWithSchemaOptions<T, S> = {
+    key: string;
+    schema: Struct<T, S>;
+    fallback: T;
+    migrate?: (value: unknown, errors: Failure[], fallback: T) => T;
+};
 
 class LocalStorageWithSchema<T = unknown, S = unknown> {
     #key: string;
     #schema: Struct<T, S>;
-    
-    constructor(key: string, schema: Struct<T, S>) {
+    #fallback: T;
+    #migrate?: (value: unknown, errors: Failure[], fallback: T) => T;
+
+    constructor({
+        key,
+        schema,
+        fallback,
+        migrate,
+    }: LocalStorageWithSchemaOptions<T, S>) {
         this.#key = key;
         this.#schema = schema;
+        this.#fallback = fallback;
+        this.#migrate = migrate;
     }
 
-    getData(): T {
+    get(): T {
         const rawStoredData = window.localStorage.getItem(this.#key);
 
         if (!rawStoredData) {
-            throw new Error(`Data with key ${this.#key} does not exist in LocalStorage.`);
+            return this.#fallback;
         }
 
         let parsedData: unknown;
 
-        if (this.#schema.TYPE === "string") {
-            parsedData = rawStoredData;
-        } else if (this.#schema.TYPE === "number") {
-            parsedData = parseFloat(rawStoredData);
-        } else {
+        try {
             parsedData = JSON.parse(rawStoredData);
+        } catch (e) {
+            console.log(
+                `Data from LocalStorage of key: ${this.#key} is not a valid JSON. Using fallback`,
+                e,
+            );
+
+            return this.#fallback;
         }
 
         const [error, validatedData] = this.#schema.validate(parsedData);
 
-        if (error) {
-            throw new Error(`Mismatch of data in LocalStorage with schema of key: ${this.#key}. This is bad!`);
+        if (validatedData) {
+            return validatedData;
         }
 
-        return validatedData;
+        let newValue = this.#fallback;
+
+        if (this.#migrate) {
+            const errors: Failure[] = [];
+
+            for (const value of error!.failures()) {
+                errors.push(value);
+            }
+
+            const migrated = this.#migrate(
+                parsedData,
+                errors,
+                deepClone(this.#fallback),
+            );
+
+            const [migrationError, validatedMigrationData] =
+                this.#schema.validate(migrated);
+
+            if (validatedMigrationData) {
+                newValue = validatedMigrationData;
+            } else {
+                console.error(
+                    `Data from LocalStorage of key: ${this.#key} has invalid schema! This is bad!`,
+                    migrationError,
+                );
+            }
+        }
+
+        window.localStorage.setItem(this.#key, JSON.stringify(newValue));
+
+        return newValue;
+    }
+
+    set(data: T): boolean {
+        const [error, validatedData] = this.#schema.validate(data);
+
+        if (validatedData) {
+            window.localStorage.setItem(
+                this.#key,
+                JSON.stringify(validatedData),
+            );
+
+            return true;
+        }
+
+        console.error(
+            `Failed to set ${this.#key} in LocalStorage`,
+            data,
+            error,
+        );
+
+        return false;
     }
 }
 

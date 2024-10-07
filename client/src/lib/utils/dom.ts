@@ -1,63 +1,80 @@
-type DomMetadata = {
-    /**
-     *
-     * An element's row idx based
-     * on its parent.
-     */
-    rowIdx: number;
-    element: HTMLElement;
+import { getTransitionDuration } from "./misc";
+import { sleep } from "./time";
 
-    /**
-     *
-     * All DOM properties of `element` upon the retrieval
-     * of the `element`'s DOMRect.
-     */
-    domRect: DOMRect;
-};
+async function swapElements(el1: Element, el2: Element): Promise<void> {
+    if (el1.classList.contains("hidden") && !el2.classList.contains("hidden")) {
+        el2.classList.add("fade-out");
 
-/**
- *
- * Gets all the dom metadata of the children of `element`. Note
- * that this is only one level deep.
- *
- * @param element The parent element
- */
-function getDomMetadataOfChildren(element: HTMLElement): DomMetadata[] {
-    const results: DomMetadata[] = [];
-    let siblingRect: DOMRect | undefined;
-    let currRowIdx = 0;
+        const el2Duration = getTransitionDuration(el2);
 
-    for (let i = 0, l = element.children.length; i < l; ++i) {
-        const child = element.children[i] as HTMLElement;
-        const domRect = child.getBoundingClientRect();
+        await sleep(el2Duration);
 
-        if (i === 0) {
-            results.push({
-                element: child,
-                domRect,
-                rowIdx: 0,
-            });
+        el2.classList.add("hidden");
+        el2.classList.remove("fade-out");
 
-            siblingRect = domRect;
+        el1.classList.remove("hidden");
+        el1.classList.add("fade-in");
 
-            continue;
-        }
+        const el1Duration = getTransitionDuration(el1);
 
-        if (siblingRect!.top < domRect.top) {
-            currRowIdx += 1;
-        }
+        await sleep(el1Duration);
 
-        results.push({
-            domRect,
-            element: child,
-            rowIdx: currRowIdx,
-        });
+        el1.classList.remove("fade-in");
+    } else if (
+        !el1.classList.contains("hidden") &&
+        el2.classList.contains("hidden")
+    ) {
+        el1.classList.add("fade-out");
 
-        siblingRect = domRect;
+        const el1Duration = getTransitionDuration(el1);
+
+        await sleep(el1Duration);
+
+        el1.classList.add("hidden");
+        el1.classList.remove("fade-out");
+
+        el2.classList.remove("hidden");
+        el2.classList.add("fade-in");
+
+        const el2Duration = getTransitionDuration(el2);
+
+        await sleep(el2Duration);
+
+        el2.classList.remove("fade-in");
+        // Only fade in second
+    } else if (
+        el1.classList.contains("hidden") &&
+        el2.classList.contains("hidden")
+    ) {
+        el2.classList.remove("hidden");
+        el2.classList.add("fade-in");
+
+        const el2Duration = getTransitionDuration(el2);
+
+        await sleep(el2Duration);
+
+        el2.classList.remove("fade-in");
     }
-
-    return results;
 }
 
-export { getDomMetadataOfChildren };
-export type { DomMetadata };
+function loadCss(href: string, prepend = false): void {
+    const link = document.createElement("link");
+
+    link.type = "text/css";
+    link.rel = "stylesheet";
+    link.href = href;
+
+    const head = document.getElementsByTagName("head")[0];
+
+    if (head === undefined) {
+        throw new Error("Failed to load CSS - `head` is undefined");
+    }
+
+    if (prepend) {
+        head.prepend(link);
+    } else {
+        head.appendChild(link);
+    }
+}
+
+export { loadCss, swapElements };
