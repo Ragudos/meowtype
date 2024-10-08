@@ -23,7 +23,7 @@ async function loadTypingScreen(): Promise<void> {
         "wordsInput",
         new typingModule.TypingState(str),
         new typingModule.TypingRenderer("words"),
-        new typingModule.Caret(),
+        new typingModule.Caret("caret"),
     );
 
     typingContainer.start();

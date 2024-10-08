@@ -27,9 +27,11 @@ class LocalStorageWithSchema<T = unknown, S = unknown> {
     }
 
     get(): T {
+        console.log("Getting config from LocalStorage");
         const rawStoredData = window.localStorage.getItem(this.#key);
 
         if (!rawStoredData) {
+            console.log("No stored config: using fallback");
             return this.#fallback;
         }
 
@@ -81,6 +83,7 @@ class LocalStorageWithSchema<T = unknown, S = unknown> {
         }
 
         window.localStorage.setItem(this.#key, JSON.stringify(newValue));
+        console.log("Loaded new config to LocalStorage");
 
         return newValue;
     }

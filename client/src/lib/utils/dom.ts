@@ -77,4 +77,40 @@ function loadCss(href: string, prepend = false): void {
     }
 }
 
-export { loadCss, swapElements };
+/**
+ *
+ * Returns an element's row index position among the children of a
+ * container.
+ *
+ * @param element
+ * @param container
+ * @returns
+ */
+function getElementRow(element: Element, container: Element): number {
+    if (element === container.children[0]) {
+        return 0;
+    }
+
+    const elBoundingRect = element.getBoundingClientRect();
+
+    let currRow = 0;
+    let lastOffsetTop = container.children[0].getBoundingClientRect().top;
+
+    for (let i = 1, l = container.children.length; i < l; ++i) {
+        const currEl = container.children[i];
+
+        if (currEl === element) {
+            return currRow;
+        }
+
+        if (elBoundingRect.top > lastOffsetTop) {
+            currRow += 1;
+            lastOffsetTop = currEl.getBoundingClientRect().top;
+        }
+    }
+
+    return currRow;
+}
+
+export { getElementRow, loadCss, swapElements };
+

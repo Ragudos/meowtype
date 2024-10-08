@@ -59,12 +59,31 @@ function deepClone<T>(obj: T | T[]): T | T[] {
     return cloneObj;
 }
 
+function isNumber(num: unknown): num is number {
+    const isFin = isFinite !== undefined ? isFinite : Number.isFinite;
+
+    if (num === null || num === undefined) {
+        return false;
+    }
+
+    if (typeof num === "string") {
+        if (num.trim() === "") {
+            return false;
+        }
+
+        num = +num;
+    }
+
+    return typeof num === "number" && !isNaN(num) && isFin(num);
+}
+
 export {
     applyReducedMotion,
     deepClone,
     getItemAt,
     getTransitionDuration,
     isDevEnvironment,
+    isNumber,
     isObject,
     prefersReducedMotion,
 };

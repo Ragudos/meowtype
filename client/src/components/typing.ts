@@ -1,6 +1,6 @@
 import Observer from "@/lib/state/observer";
-import Config from "@/lib/utils/config";
-import { getItemAt, isDevEnvironment } from "@/lib/utils/misc";
+import Settings from "@/lib/utils/config";
+import { getItemAt, isDevEnvironment, isNumber } from "@/lib/utils/misc";
 import { removeWhitespacesFromSplitString } from "@/lib/utils/string";
 import { assert, nonempty, string } from "superstruct";
 
@@ -81,17 +81,63 @@ function typedCharacterToCharacter(typedChar: TypedCharacter): Character {
     };
 }
 
-type TypingStateEvent = {
-    evType: "prev" | "del" | "add" | "next";
-};
+function isIndex(idx: unknown): idx is Index {
+    return (
+        idx !== null &&
+        typeof idx === "object" &&
+        "rel" in idx &&
+        isNumber(idx.rel) &&
+        "abs" in idx &&
+        isNumber(idx.abs)
+    );
+}
+
+function isCharacter(char: unknown): char is Character {
+    return (
+        char !== null &&
+        typeof char === "object" &&
+        "idx" in char &&
+        isIndex(char.idx) &&
+        "origIdx" in char &&
+        isIndex(char.origIdx) &&
+        "value" in char &&
+        typeof char.value === "string" &&
+        char.value.length === 1
+    );
+}
+
+function isTypedCharacter(char: unknown): char is TypedCharacter {
+    return isCharacter(char) && "typedValue" in char && "isExtra" in char;
+}
+
+type TypingStateEvent =
+    | {
+          evType: "add";
+          currWord: Word;
+      }
+    | {
+          evType: "prev";
+          currWord: Word;
+          /** Since we're casting this from TypedWord to Word, the type is Word */
+          prevWord: Word;
+      }
+    | {
+          evType: "next";
+          /** Since we're casting this from Word to TypedWord, the type is TypedWord */
+          currWord: TypedWord;
+          nextWord: Word;
+      }
+    | {
+          evType: "del";
+          currWord: Word;
+      };
 
 class TypingState {
     readonly evtObserver: Observer<TypingStateEvent>;
 
     #originalString: string;
-
-    protected words: Word[];
-    protected typedWords: TypedWord[];
+    #words: Word[];
+    #typedWords: TypedWord[];
 
     /**
      *
@@ -100,8 +146,8 @@ class TypingState {
     constructor(str: string) {
         const tokenized = this.#processString(str);
 
-        this.words = [];
-        this.typedWords = [];
+        this.#words = [];
+        this.#typedWords = [];
         this.#originalString = tokenized.join(" ");
         this.evtObserver = new Observer();
 
@@ -114,20 +160,17 @@ class TypingState {
             const word = tokenized[i];
 
             this.#addWord(word, currCharIdx, i, i);
-
-            currCharIdx.abs += word.length + 1;
-            currCharIdx.rel += word.length + 1;
         }
     }
 
     backspace(ev: KeyboardEvent): void {
-        const config = Config.get();
+        const config = Settings.get();
 
         if (config.confidenceMode === "max") {
             return ev.preventDefault();
         }
 
-        const wordToBeTyped = getItemAt(this.words, 0);
+        const wordToBeTyped = getItemAt(this.#words, 0);
 
         if (wordToBeTyped.typedCharacters.length === 0) {
             if (wordToBeTyped.idx.rel === 0) {
@@ -144,15 +187,19 @@ class TypingState {
                 return ev.preventDefault();
             }
 
+            const HAS_SKIPPED_CHARS = !lastTypedWord.typedCharacters.some(
+                (c) => c.typedValue === "",
+            );
+
             const castLastTypedWordToWord: Word = {
                 characterCount: lastTypedWord.characterCount,
                 idx: lastTypedWord.idx,
-                characters: config.strictSpace
+                characters: HAS_SKIPPED_CHARS
                     ? []
                     : this.#filterSkippedCharacters(
                           lastTypedWord.typedCharacters,
                       ).map(typedCharacterToCharacter),
-                typedCharacters: config.strictSpace
+                typedCharacters: HAS_SKIPPED_CHARS
                     ? lastTypedWord.typedCharacters
                     : this.#filterSkippedCharacters(
                           lastTypedWord.typedCharacters,
@@ -160,9 +207,13 @@ class TypingState {
                       ),
             };
 
-            this.words.unshift(castLastTypedWordToWord);
-            this.typedWords.pop();
-            this.evtObserver.notify({ evType: "prev" });
+            this.#words.unshift(castLastTypedWordToWord);
+            this.#typedWords.pop();
+            this.evtObserver.notify({
+                evType: "prev",
+                currWord: wordToBeTyped,
+                prevWord: castLastTypedWordToWord,
+            });
 
             return;
         }
@@ -177,36 +228,53 @@ class TypingState {
             });
         }
 
-        this.evtObserver.notify({ evType: "del" });
+        this.evtObserver.notify({
+            evType: "del",
+            currWord: wordToBeTyped,
+        });
     }
 
     addCharacter(ev: KeyboardEvent): void {
-        if (this.words.length === 0) {
+        if (this.#words.length === 0) {
             console.error("All words have been emptied out!");
         }
 
-        const config = Config.get();
+        const config = Settings.get();
         const key = ev.key;
-        const wordToBeTyped = getItemAt(this.words, 0);
+        const wordToBeTyped = getItemAt(this.#words, 0);
 
-        if (key === " " && !config.strictSpace) {
-            while (wordToBeTyped.characters.length !== 0) {
-                wordToBeTyped.typedCharacters.push({
-                    ...wordToBeTyped.characters.shift()!,
-                    isExtra: false,
-                    typedValue: " ",
-                });
+        if (key === " ") {
+            if (
+                wordToBeTyped.typedCharacters.length === 0 &&
+                !config.strictSpace
+            ) {
+                // Don't allow the user to press space at
+                // the beginning of a word  when strictSpace is disabled
+                return ev.preventDefault();
+            } else if (wordToBeTyped.typedCharacters.length !== 0) {
+                while (wordToBeTyped.characters.length !== 0) {
+                    wordToBeTyped.typedCharacters.push({
+                        ...wordToBeTyped.characters.shift()!,
+                        isExtra: false,
+                        // since this is a skipped character,
+                        // we just make it an empty string
+                        typedValue: "",
+                    });
+                }
+
+                return this.#nextWord();
             }
-
-            this.#nextWord();
-
-            return;
         }
 
         const nextCharToType = wordToBeTyped.characters.shift();
 
         if (nextCharToType === undefined) {
             if (key === " ") {
+                if (wordToBeTyped.idx.abs + 1 === this.words.length) {
+                    // TODO: Handle end here...
+                    return;
+                }
+
                 return this.#nextWord();
             }
 
@@ -233,7 +301,10 @@ class TypingState {
             });
         }
 
-        this.evtObserver.notify({ evType: "add" });
+        this.evtObserver.notify({
+            evType: "add",
+            currWord: wordToBeTyped,
+        });
 
         if (config.eagerFinish) {
             if (wordToBeTyped.characters.length === 0) {
@@ -249,7 +320,7 @@ class TypingState {
      * @param str The string to add to be typed
      */
     addToString(str: string): void {
-        if (this.words.length === 0 && this.typedWords.length === 0) {
+        if (this.#words.length === 0 && this.#typedWords.length === 0) {
             throw new Error("`words` and `typedWords` is empty...");
         }
 
@@ -273,15 +344,25 @@ class TypingState {
             const word = tokenized[i];
 
             this.#addWord(word, currCharIdx, i, i);
-
-            currCharIdx.abs += word.length + 1;
-            currCharIdx.rel += word.length + 1;
         }
     }
 
+    /**
+     *
+     * **WARNING:** This does not do checks and does what it literally is named for.
+     *
+     * Before calling this function, take note to do checks whether we are at the last word or not.
+     */
     #nextWord(): void {
-        this.typedWords.push(wordToTypedWord(this.words.shift()!));
-        this.evtObserver.notify({ evType: "next" });
+        const currWord = this.#words.shift()!;
+        const casted = wordToTypedWord(currWord);
+
+        this.#typedWords.push(casted);
+        this.evtObserver.notify({
+            evType: "next",
+            currWord: casted,
+            nextWord: getItemAt(this.words, 0),
+        });
     }
 
     /**
@@ -330,7 +411,10 @@ class TypingState {
             });
         }
 
-        this.words.push(wordObj);
+        this.#words.push(wordObj);
+
+        currCharIdx.abs += 1;
+        currCharIdx.rel += 1;
     }
 
     /**
@@ -345,21 +429,180 @@ class TypingState {
         getSkippedCharacters = true,
     ): TypedCharacter[] {
         return characters.filter((c, i) => {
-            const condition =
-                !c.isExtra && c.typedValue === " " && i < characters.length;
+            const condition = !c.isExtra && c.typedValue === "";
 
             return getSkippedCharacters ? condition : !condition;
         });
     }
+
+    get words(): Word[] {
+        return this.#words;
+    }
+
+    get typedWords(): TypedWord[] {
+        return this.#typedWords;
+    }
 }
 
-class Caret {}
+class Caret {
+    protected caretElId: string;
+
+    constructor(caretElId: string) {
+        this.caretElId = caretElId;
+    }
+
+    update(ev: TypingStateEvent): void {}
+}
 
 class TypingRenderer {
     protected wordsContainerId: string;
+    protected initialized: boolean;
 
     constructor(wordsContainerId: string) {
         this.wordsContainerId = wordsContainerId;
+        this.initialized = false;
+    }
+
+    /**
+     *
+     * Displays the initial {@link Word}[] and {@link TypedWord}[]
+     * in `wordsContainer`.
+     *
+     * @param words
+     * @param typedWords
+     * @returns
+     */
+    init(words: Word[], typedWords?: TypedWord[]): void {
+        if (this.initialized) {
+            return;
+        }
+
+        const wordsContainer = this.getWordsContainer();
+
+        for (let i = 0, l = typedWords?.length || 0; typedWords && i < l; ++i) {
+            const word = typedWords[i];
+            const wordEl = document.createElement("div");
+
+            wordEl.classList.add("word", "typed");
+            this.#appendCharactersOfWord(wordEl, word);
+            wordsContainer.appendChild(wordEl);
+        }
+
+        for (let i = 0, l = words.length; i < l; ++i) {
+            const word = words[i];
+            const wordEl = document.createElement("div");
+
+            wordEl.classList.add("word");
+
+            if (i === 0) {
+                wordEl.classList.add("active");
+            }
+
+            this.#appendCharactersOfWord(wordEl, word);
+            wordsContainer.appendChild(wordEl);
+        }
+
+        this.initialized = true;
+    }
+
+    /** Clears the display */
+    reset(): void {
+        if (!this.initialized) {
+            return;
+        }
+
+        this.initialized = false;
+        this.getWordsContainer().innerHTML = "";
+    }
+
+    /**
+     *
+     * Update the current displayed word based on
+     * info sent by {@link TypingStateEvent}
+     */
+    update(ev: TypingStateEvent): void {
+        const config = Settings.get();
+        const wordsContainer = this.getWordsContainer();
+        const currWord = ev.currWord;
+        const wordEl = getItemAt(wordsContainer.children, currWord.idx.rel);
+
+        if (!(wordEl instanceof HTMLElement)) {
+            return console.error("Word element is not an HTMLElement", wordEl);
+        }
+
+        switch (ev.evType) {
+            case "add":
+                {
+                    const lastCharTyped = getItemAt(
+                        currWord.typedCharacters,
+                        -1,
+                    );
+
+                    if (lastCharTyped.isExtra) {
+                        const charEl = document.createElement("letter");
+
+                        charEl.classList.add("incorrect", "extra");
+
+                        this.#displayCharText(
+                            wordEl,
+                            charEl,
+                            lastCharTyped,
+                            true,
+                            false,
+                        );
+
+                        wordEl.appendChild(charEl);
+
+                        return;
+                    }
+
+                    const charEl = getItemAt(
+                        wordEl.children,
+                        lastCharTyped.idx.rel,
+                    );
+
+                    if (!(charEl instanceof HTMLElement)) {
+                        return console.error(
+                            "Character element is not an HTMLElement",
+                            charEl,
+                        );
+                    }
+
+                    const IS_CORRECT =
+                        lastCharTyped.typedValue === lastCharTyped.value;
+
+                    if (IS_CORRECT) {
+                        charEl.classList.add("correct");
+                    } else {
+                        charEl.classList.add("incorrect");
+                    }
+
+                    this.#displayCharText(
+                        wordEl,
+                        charEl,
+                        lastCharTyped,
+                        true,
+                        IS_CORRECT,
+                    );
+                }
+                break;
+            case "prev":
+                {
+                }
+                break;
+            case "del":
+                {
+                }
+                break;
+            case "next":
+                {
+                }
+                break;
+            default:
+                console.error(
+                    "Received invalid mode for updating typing display!",
+                );
+        }
     }
 
     getWordsContainer(): HTMLElement {
@@ -372,6 +615,96 @@ class TypingRenderer {
         }
 
         return container;
+    }
+
+    #appendCharacterToWordEl(
+        wordEl: HTMLElement,
+        character: Character | TypedCharacter,
+    ) {
+        const charEl = document.createElement("letter");
+        const IS_TYPED_CHAR = isTypedCharacter(character);
+        const IS_CORRECT =
+            IS_TYPED_CHAR &&
+            character.typedValue === character.value &&
+            !character.isExtra;
+
+        if (IS_CORRECT) {
+            charEl.classList.add("correct");
+        } else if (IS_TYPED_CHAR) {
+            charEl.classList.add("incorrect");
+        }
+
+        if (IS_TYPED_CHAR && character.isExtra) {
+            charEl.classList.add("extra");
+        }
+
+        this.#displayCharText(
+            wordEl,
+            charEl,
+            character,
+            IS_TYPED_CHAR,
+            IS_CORRECT,
+        );
+
+        wordEl.appendChild(charEl);
+    }
+
+    #appendCharactersOfWord(wordEl: HTMLElement, word: Word | TypedWord): void {
+        for (let i = 0, l = word.typedCharacters.length; i < l; ++i) {
+            this.#appendCharacterToWordEl(wordEl, word.typedCharacters[i]);
+        }
+
+        for (let i = 0, l = word.characters.length; i < l; ++i) {
+            this.#appendCharacterToWordEl(wordEl, word.characters[i]);
+        }
+    }
+
+    /**
+     *
+     * Displays the character and if it's a {@link TypedCharacter}
+     * with a typo, it's typo as well depending on {@link Settings}.
+     *
+     * @param charEl
+     * @param character
+     */
+    #displayCharText(
+        wordEl: HTMLElement,
+        charEl: HTMLElement,
+        character: Character | TypedCharacter,
+        isTypedChar: boolean,
+        isCorrect: boolean,
+    ) {
+        if (!isTypedChar || isCorrect) {
+            charEl.textContent = character.value;
+
+            return;
+        }
+
+        const settings = Settings.get();
+
+        switch (settings.indicateTypos) {
+            case "off":
+                {
+                    charEl.textContent = (character as TypedCharacter).value;
+                }
+                break;
+            case "below":
+                {
+                    // TODO
+                }
+                break;
+            case "replace":
+                {
+                    charEl.textContent = (
+                        character as TypedCharacter
+                    ).typedValue;
+                }
+                break;
+            default:
+                console.error(
+                    `Received invalid value for Settings property of indicateTypes: ${settings.indicateTypos}`,
+                );
+        }
     }
 }
 
@@ -428,6 +761,7 @@ class TypingContainer {
         this.#hasStarted = true;
 
         this.getInput().disabled = false;
+        this.#renderer.init(this.#state.words, this.#state.typedWords);
 
         // TODO: init renderer and caret
     }
@@ -445,6 +779,7 @@ class TypingContainer {
             .getWordsContainer()
             .removeEventListener("click", this.#focusListener);
         this.#state.evtObserver.unsubscribe(this.#stateListener);
+        this.#renderer.reset();
 
         this.#hasStarted = false;
         this.#isFinished = true;
@@ -499,7 +834,10 @@ class TypingContainer {
         console.log(this);
     }
 
-    #onStateUpdate(ev: TypingStateEvent): void {}
+    #onStateUpdate(ev: TypingStateEvent): void {
+        this.#renderer.update(ev);
+        this.#caret.update(ev);
+    }
 }
 
 export {
@@ -511,3 +849,4 @@ export {
     wordToTypedWord,
 };
 export type { Character, TypedCharacter, TypedWord, Word };
+
