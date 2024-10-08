@@ -58,7 +58,7 @@
     color: hsl(var(--typing-error-extra-foreground));
 }
 
-.word.incorrect.typed letter:not(.correct, .incorrect, .extra) {
+.word.incorrect.typed letter {
     border-bottom-color: hsl(var(--typing-error-foreground));
 }
 

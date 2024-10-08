@@ -1,4 +1,5 @@
 import Observer from "@/lib/state/observer";
+import MemoryCache from "@/lib/utils/cache";
 import Settings from "@/lib/utils/config";
 import { getItemAt, isDevEnvironment, isNumber } from "@/lib/utils/misc";
 import { removeWhitespacesFromSplitString } from "@/lib/utils/string";
@@ -48,6 +49,51 @@ type Word = {
 type TypedWord = Word & {
     isCorrect: boolean;
 };
+
+type WordElementMetadata = {
+    domRect: DOMRect;
+    /**
+     *
+     * The row index-based position this word elemenet is in in the DOM.
+     */
+    rowIdx: number;
+};
+
+type TypingStateEvent =
+    | {
+          evType: "add";
+          currWord: Word;
+      }
+    | {
+          evType: "prev";
+          currWord: Word;
+          /**
+           *
+           * Since we're casting this from TypedWord to Word, the type is Word.
+           * This is the previously `currWord`, but is now `prevWord` when
+           * {@link TypingStateEvent} is emitted.
+           */
+          prevTypedWord: Word;
+      }
+    | {
+          evType: "next";
+          /**
+           *
+           * Since we're casting this from Word to TypedWord, the type is TypedWord
+           * This is the `currWord` which is turned into a TypedWord after
+           * {@link TypingStateEvent} is emitted.
+           */
+          currWord: TypedWord;
+          /**
+           *
+           * The new active word after {@link TypingStateEvent} is emitted.
+           */
+          nextWord: Word;
+      }
+    | {
+          evType: "del";
+          currWord: Word;
+      };
 
 /**
  *
@@ -109,28 +155,6 @@ function isCharacter(char: unknown): char is Character {
 function isTypedCharacter(char: unknown): char is TypedCharacter {
     return isCharacter(char) && "typedValue" in char && "isExtra" in char;
 }
-
-type TypingStateEvent =
-    | {
-          evType: "add";
-          currWord: Word;
-      }
-    | {
-          evType: "prev";
-          currWord: Word;
-          /** Since we're casting this from TypedWord to Word, the type is Word */
-          prevWord: Word;
-      }
-    | {
-          evType: "next";
-          /** Since we're casting this from Word to TypedWord, the type is TypedWord */
-          currWord: TypedWord;
-          nextWord: Word;
-      }
-    | {
-          evType: "del";
-          currWord: Word;
-      };
 
 class TypingState {
     readonly evtObserver: Observer<TypingStateEvent>;
@@ -212,7 +236,7 @@ class TypingState {
             this.evtObserver.notify({
                 evType: "prev",
                 currWord: wordToBeTyped,
-                prevWord: castLastTypedWordToWord,
+                prevTypedWord: castLastTypedWordToWord,
             });
 
             return;
@@ -444,14 +468,30 @@ class TypingState {
     }
 }
 
+type CaretTracker = {
+    wordIdx: Index;
+    characterIdx: Index;
+};
+
 class Caret {
     protected caretElId: string;
+
+    /**
+     *
+     * For events where we sync the Caret upon a change in
+     * the order of the elements upon screen size
+     * or the addition of extra characters (new row, etc.).
+     */
+    #lastTrackedWord: CaretTracker;
 
     constructor(caretElId: string) {
         this.caretElId = caretElId;
     }
 
-    update(ev: TypingStateEvent): void {}
+    update(
+        ev: TypingStateEvent,
+        wordsMetadataCache: MemoryCache<number, WordElementMetadata>,
+    ): void {}
 }
 
 class TypingRenderer {
@@ -520,7 +560,10 @@ class TypingRenderer {
      * Update the current displayed word based on
      * info sent by {@link TypingStateEvent}
      */
-    update(ev: TypingStateEvent): void {
+    update(
+        ev: TypingStateEvent,
+        wordsMetadataCache: MemoryCache<number, WordElementMetadata>,
+    ): void {
         const config = Settings.get();
         const wordsContainer = this.getWordsContainer();
         const currWord = ev.currWord;
@@ -539,10 +582,11 @@ class TypingRenderer {
                     );
 
                     if (lastCharTyped.isExtra) {
+                        // TODO: Re-sync the cache if the order of the elements
+                        // was re-arranged because of line-wrap/word-break
                         const charEl = document.createElement("letter");
 
                         charEl.classList.add("incorrect", "extra");
-
                         this.#displayCharText(
                             wordEl,
                             charEl,
@@ -550,7 +594,6 @@ class TypingRenderer {
                             true,
                             false,
                         );
-
                         wordEl.appendChild(charEl);
 
                         return;
@@ -569,14 +612,14 @@ class TypingRenderer {
                     }
 
                     const IS_CORRECT =
-                        lastCharTyped.typedValue === lastCharTyped.value;
+                        lastCharTyped.typedValue === lastCharTyped.value &&
+                        !lastCharTyped.isExtra;
 
-                    if (IS_CORRECT) {
-                        charEl.classList.add("correct");
-                    } else {
-                        charEl.classList.add("incorrect");
-                    }
-
+                    this.#addClasslistToCharEl(
+                        charEl,
+                        lastCharTyped.isExtra,
+                        IS_CORRECT,
+                    );
                     this.#displayCharText(
                         wordEl,
                         charEl,
@@ -588,14 +631,78 @@ class TypingRenderer {
                 break;
             case "prev":
                 {
+                    const prevTypedWord = ev.prevTypedWord;
+                    const prevTypedWordEl = getItemAt(
+                        wordsContainer.children,
+                        prevTypedWord.idx.rel,
+                    );
+
+                    wordEl.classList.remove("active");
+
+                    prevTypedWordEl.classList.add("active");
+                    prevTypedWordEl.classList.remove(
+                        "correct",
+                        "incorrect",
+                        "typed",
+                    );
                 }
                 break;
             case "del":
                 {
+                    /**
+                     *
+                     * >= because after this function `update` is called by
+                     * by the TypingStateEvent, the supposed character
+                     * to be deleted has already been deleted in state
+                     */
+                    if (
+                        currWord.typedCharacters.length >=
+                        currWord.characterCount
+                    ) {
+                        const lastTypedChar = getItemAt(
+                            currWord.typedCharacters,
+                            -1,
+                        );
+
+                        /**
+                         *
+                         * +1 because after this function `update` is called by
+                         * by the TypingStateEvent, the supposed character
+                         * to be deleted has already been deleted in state
+                         */
+                        getItemAt(
+                            wordEl.children,
+                            lastTypedChar.idx.rel + 1,
+                        ).remove();
+
+                        break;
+                    }
+
+                    const lastDeletedChar = getItemAt(currWord.characters, 0);
+                    const charEl = getItemAt(
+                        wordEl.children,
+                        lastDeletedChar.idx.rel,
+                    );
+
+                    charEl.classList.remove("correct", "incorrect");
                 }
                 break;
             case "next":
                 {
+                    const nextWordEl = getItemAt(
+                        wordsContainer.children,
+                        ev.nextWord.idx.rel,
+                    );
+
+                    wordEl.classList.remove("active");
+                    wordEl.classList.add(
+                        (currWord as TypedWord).isCorrect
+                            ? "correct"
+                            : "incorrect",
+                        "typed",
+                    );
+
+                    nextWordEl.classList.add("active");
                 }
                 break;
             default:
@@ -617,6 +724,22 @@ class TypingRenderer {
         return container;
     }
 
+    #addClasslistToCharEl(
+        charEl: HTMLElement,
+        isExtra: boolean,
+        isCorrect: boolean,
+    ) {
+        if (isCorrect) {
+            charEl.classList.add("correct");
+        } else {
+            charEl.classList.add("incorrect");
+        }
+
+        if (isExtra) {
+            charEl.classList.add("extra");
+        }
+    }
+
     #appendCharacterToWordEl(
         wordEl: HTMLElement,
         character: Character | TypedCharacter,
@@ -628,14 +751,8 @@ class TypingRenderer {
             character.typedValue === character.value &&
             !character.isExtra;
 
-        if (IS_CORRECT) {
-            charEl.classList.add("correct");
-        } else if (IS_TYPED_CHAR) {
-            charEl.classList.add("incorrect");
-        }
-
-        if (IS_TYPED_CHAR && character.isExtra) {
-            charEl.classList.add("extra");
+        if (IS_TYPED_CHAR) {
+            this.#addClasslistToCharEl(charEl, character.isExtra, IS_CORRECT);
         }
 
         this.#displayCharText(
@@ -713,6 +830,11 @@ class TypingContainer {
     #renderer: TypingRenderer;
     #caret: Caret;
 
+    /**
+     * Key is the relative idx of the word element
+     */
+    #wordElelementsMetadataCache: MemoryCache<number, WordElementMetadata>;
+
     #keydownListener: (ev: KeyboardEvent) => void;
     #stateListener: (ev: TypingStateEvent) => void;
     #focusListener: (ev: Event) => void;
@@ -733,6 +855,8 @@ class TypingContainer {
         this.#state = state;
         this.#renderer = renderer;
         this.#caret = caret;
+
+        this.#wordElelementsMetadataCache = new MemoryCache(50);
 
         this.#keydownListener = this.#onKeyDown.bind(this);
         this.#focusListener = this.onFocus.bind(this);
@@ -835,8 +959,8 @@ class TypingContainer {
     }
 
     #onStateUpdate(ev: TypingStateEvent): void {
-        this.#renderer.update(ev);
-        this.#caret.update(ev);
+        this.#renderer.update(ev, this.#wordElelementsMetadataCache);
+        this.#caret.update(ev, this.#wordElelementsMetadataCache);
     }
 }
 
