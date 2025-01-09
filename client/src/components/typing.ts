@@ -1,4 +1,5 @@
 import Observer from "@/lib/state/observer";
+import { Assert } from "@/lib/utils/assert";
 import MemoryCache from "@/lib/utils/cache";
 import Settings from "@/lib/utils/config";
 import { getItemAt, isDevEnvironment, isNumber } from "@/lib/utils/misc";
@@ -483,15 +484,171 @@ class Caret {
      * or the addition of extra characters (new row, etc.).
      */
     #lastTrackedWord: CaretTracker;
+    #initialized: boolean;
 
     constructor(caretElId: string) {
         this.caretElId = caretElId;
+        this.#initialized = false;
+    }
+
+    init(initialWord: Word, wordsContainer: HTMLElement): void {
+        Assert.assert(!this.#initialized);
+
+        const caretEl = document.getElementById(this.caretElId)!;
+
+        Assert.assert(caretEl instanceof HTMLElement);
+
+        const initialWordEl = getItemAt(
+            wordsContainer.children,
+            initialWord.idx.rel,
+        );
+
+        Assert.assert(initialWordEl.classList.contains("word"));
+        Assert.assert(initialWord.characters.length != 0);
+
+        const activeChar = initialWord.characters[0];
+        const activeCharEL = getItemAt(
+            initialWordEl.children,
+            activeChar.idx.rel,
+        )!;
+
+        Assert.assert(activeCharEL != null);
+
+        const activeCharElDOMRect = activeCharEL.getBoundingClientRect();
+        const wordsContainerDomRect = wordsContainer.getBoundingClientRect();
+
+        console.log(activeCharElDOMRect, wordsContainerDomRect);
+
+        caretEl.style.setProperty("--_opacity", "1");
+        caretEl.style.setProperty("--_visibility", "visible");
+        caretEl.style.setProperty("--_width", activeCharElDOMRect.width + "px");
+        caretEl.style.setProperty(
+            "--_height",
+            activeCharElDOMRect.height + "px",
+        );
+        caretEl.style.setProperty(
+            "--_x",
+            activeCharElDOMRect.left - wordsContainerDomRect.left + "px",
+        );
+        caretEl.style.setProperty(
+            "--_y",
+            activeCharElDOMRect.top - wordsContainerDomRect.top + "px",
+        );
+
+        this.#initialized = true;
     }
 
     update(
         ev: TypingStateEvent,
+        wordsContainer: HTMLElement,
         wordsMetadataCache: MemoryCache<number, WordElementMetadata>,
-    ): void {}
+    ): void {
+        const caretEl = document.getElementById(this.caretElId)!;
+
+        Assert.assert(caretEl instanceof HTMLElement);
+
+        switch (ev.evType) {
+            case "add":
+            case "del":
+                {
+                    const wordEl = getItemAt(
+                        wordsContainer.children,
+                        ev.currWord.idx.rel,
+                    );
+
+                    Assert.assert(wordEl.classList.contains("word"));
+
+                    // caret is at space
+                    if (ev.currWord.characters.length == 0) {
+                        const nextWordEl = getItemAt(
+                            wordsContainer.children,
+                            ev.currWord.idx.rel + 1,
+                        );
+
+                        if (!nextWordEl) {
+                            // end
+                        } else {
+                            const nextWordElDomRect =
+                                nextWordEl.getBoundingClientRect();
+                            const currWordElDomRect =
+                                wordEl.getBoundingClientRect();
+                            const wordsContainerDomRect =
+                                wordsContainer.getBoundingClientRect();
+
+                            caretEl.style.setProperty(
+                                "--_width",
+                                nextWordElDomRect.left -
+                                    (currWordElDomRect.left +
+                                        currWordElDomRect.width) +
+                                    "px",
+                            );
+                            caretEl.style.setProperty(
+                                "--_height",
+                                currWordElDomRect.height + "px",
+                            );
+                            caretEl.style.setProperty(
+                                "--_x",
+                                currWordElDomRect.left +
+                                    currWordElDomRect.width -
+                                    wordsContainerDomRect.left +
+                                    "px",
+                            );
+                            caretEl.style.setProperty(
+                                "--_y",
+                                currWordElDomRect.top -
+                                    wordsContainerDomRect.top +
+                                    "px",
+                            );
+                        }
+                    } else {
+                        const activeChar = ev.currWord.characters[0];
+                        const activeCharEL = getItemAt(
+                            wordEl.children,
+                            activeChar.idx.rel,
+                        )!;
+
+                        Assert.assert(activeCharEL != null);
+
+                        const activeCharElDOMRect =
+                            activeCharEL.getBoundingClientRect();
+                        const wordsContainerDomRect =
+                            wordsContainer.getBoundingClientRect();
+
+                        console.log(activeCharElDOMRect, wordsContainerDomRect);
+
+                        caretEl.style.setProperty(
+                            "--_width",
+                            activeCharElDOMRect.width + "px",
+                        );
+                        caretEl.style.setProperty(
+                            "--_height",
+                            activeCharElDOMRect.height + "px",
+                        );
+                        caretEl.style.setProperty(
+                            "--_x",
+                            activeCharElDOMRect.left -
+                                wordsContainerDomRect.left +
+                                "px",
+                        );
+                        caretEl.style.setProperty(
+                            "--_y",
+                            activeCharElDOMRect.top -
+                                wordsContainerDomRect.top +
+                                "px",
+                        );
+                    }
+                }
+                break;
+            case "next":
+                {
+                }
+                break;
+            case "prev":
+                {
+                }
+                break;
+        }
+    }
 }
 
 class TypingRenderer {
@@ -731,9 +888,11 @@ class TypingRenderer {
     ) {
         if (isCorrect) {
             charEl.classList.add("correct");
-        } else {
-            charEl.classList.add("incorrect");
+
+            return;
         }
+
+        charEl.classList.add("incorrect");
 
         if (isExtra) {
             charEl.classList.add("extra");
@@ -886,6 +1045,11 @@ class TypingContainer {
 
         this.getInput().disabled = false;
         this.#renderer.init(this.#state.words, this.#state.typedWords);
+        this.#caret.init(
+            this.#state.words[0],
+            this.#renderer.getWordsContainer(),
+        );
+        this.#initwordElementsMetadataMemoryCache();
 
         // TODO: init renderer and caret
     }
@@ -960,7 +1124,55 @@ class TypingContainer {
 
     #onStateUpdate(ev: TypingStateEvent): void {
         this.#renderer.update(ev, this.#wordElelementsMetadataCache);
-        this.#caret.update(ev, this.#wordElelementsMetadataCache);
+        this.#caret.update(
+            ev,
+            this.#renderer.getWordsContainer(),
+            this.#wordElelementsMetadataCache,
+        );
+
+        const currWordMetadata = this.#wordElelementsMetadataCache.get(
+            ev.currWord.idx.rel,
+        );
+
+        console.log(currWordMetadata);
+    }
+
+    // TODO: only include visible words in the cache
+    // since it can depend on settings on how many words are
+    // visible by default.
+    #initwordElementsMetadataMemoryCache(): void {
+        const words = this.#state.words;
+        const cache = this.#wordElelementsMetadataCache;
+        const wordsContainer = this.#renderer.getWordsContainer();
+
+        let highestHeight = -Infinity;
+        let currRowIdx = -1;
+
+        for (let i = 0, l = words.length; i < l; ++i) {
+            const word = words[i];
+            const wordEl = wordsContainer.querySelector(
+                `.word:nth-child(${word.idx.rel + 1})`,
+            );
+
+            if (wordEl === null) {
+                console.error(`Received null wordEl at idx ${i}:`, word);
+            } else {
+                const domRect = wordEl.getBoundingClientRect();
+                const wordElEndYPosition = domRect.height + domRect.top;
+
+                if (wordElEndYPosition > highestHeight) {
+                    highestHeight = wordElEndYPosition;
+                    currRowIdx += 1;
+                }
+
+                cache.set(word.idx.rel, {
+                    domRect,
+                    rowIdx: currRowIdx,
+                });
+            }
+        }
+
+        console.log(cache);
     }
 }
 

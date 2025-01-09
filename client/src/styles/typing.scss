@@ -75,6 +75,9 @@
 
     background-color: hsl(var(--accent) / 0.75);
 
-    transition-property: opacity, transform, top, left, right, bottom;
+    transition-property: opacity, visibility, transform, top, left, right, bottom;
     transition-duration: calc(#{$transition-duration} / 2);
+
+    opacity: var(--_opacity, 0);
+    visibility: var(--_visibility, hidden);
 }
